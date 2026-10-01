@@ -14,7 +14,7 @@ COPY src src
 
 ENV PORT=7895 \
     STATIC_FILES=/files \
-    CACHE_DIR=/pkg_sender/cache \
+    CACHE_DIR=/cache \
     PS4PORT=12800
 
 EXPOSE 7895

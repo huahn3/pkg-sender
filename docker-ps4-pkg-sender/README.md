@@ -35,9 +35,41 @@ and the `pkg-receiver.elf` API from this repository.
 
 ## Quick start
 
+One-liner (image is built automatically by GitHub Actions on every push to
+`docker-ps4-pkg-sender/`):
+
+```yaml
+version: '3.8'
+
+services:
+  ps4-pkg-sender:
+    image: ghcr.io/huahn3/docker-ps4-pkg-sender:latest
+    container_name: ps4-pkg-sender
+    restart: unless-stopped
+    ports:
+      - "7895:7895"
+    environment:
+      - PORT=7895
+      - LOCALIP=192.168.31.88      # NAS/LAN IP the console downloads from
+      - PS4IP=192.168.31.176       # console IP
+      - PS4PORT=12800
+      - INSTALL_DELAY_MS=300
+    volumes:
+      - /vol2/1000/R0/PS5/:/files:ro
+      - pkg-sender-cache:/cache
+
+volumes:
+  pkg-sender-cache:
+```
+
 ```sh
-docker compose up -d --build
-# open http://<LOCALIP>:7895/
+docker compose up -d
+```
+
+Building locally instead (no GitHub needed):
+
+```sh
+docker compose up -d --build      # compose uses `build: .` + image name below
 ```
 
 ## Configure
@@ -52,7 +84,7 @@ docker compose up -d --build
 | `PS4PORT` | `12800` | Receiver / RPI port |
 | `INSTALL_DELAY_MS` | `300` | Delay between two queued installs |
 
-## Example: NAS + docker compose
+## Alternative: build on the NAS (offline, no GitHub)
 
 ```yaml
 version: '3.8'
@@ -70,7 +102,7 @@ services:
       - STATIC_FILES=/files
       - CACHE_DIR=/cache
       - LOCALIP=192.168.31.88      # NAS/LAN IP the console downloads from
-      - PS4IP=192.168.32.176       # console IP
+      - PS4IP=192.168.31.176       # console IP
       - PS4PORT=12800
       - INSTALL_DELAY_MS=300
     volumes:
