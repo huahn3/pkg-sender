@@ -31,9 +31,12 @@ function flash(msg, kind) {
   el.__t = setTimeout(function () { el.className = 'flash'; }, 2600);
 }
 
-function pkgUrl(rel) {
+function pkgUrl(idOrRel) {
   const base = window.__BASE__ || '';
-  return base + '/pkg/' + rel.split('/').map(encodeURIComponent).join('/');
+  if (typeof idOrRel === 'string' && idOrRel.startsWith('lib-')) {
+    return base + '/pkg/' + idOrRel;
+  }
+  return base + '/pkg/' + String(idOrRel).split('/').map(encodeURIComponent).join('/');
 }
 
 // ------------------------------------------------------------ console status
@@ -294,8 +297,9 @@ document.addEventListener('click', function (e) {
   if (copy) {
     e.preventDefault();
     e.stopPropagation();
-    const rel = copy.closest('.row').dataset.rel;
-    const url = pkgUrl(rel);
+    const row = copy.closest('.row');
+    const target = row.dataset.id || row.dataset.rel;
+    const url = pkgUrl(target);
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(
         function () { flash('已复制直链'); },

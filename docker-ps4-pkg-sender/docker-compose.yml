@@ -11,9 +11,11 @@ services:
     environment:
       - PORT=7895
       - STATIC_FILES=/files
-      - LOCALIP=192.168.31.88
-      - PS4IP=192.168.32.176
-      - PS4PORT=12800
+      - CACHE_DIR=/cache
+      - LOCALIP=192.168.31.88      # NAS/Host LAN IP that the console downloads PKGs from
+      - PS4IP=192.168.31.176       # PS5/PS4 console LAN IP
+      - PS4PORT=12800              # PS5 pkg-receiver / PS4 RPI port
       - INSTALL_DELAY_MS=300
     volumes:
       - /vol2/1000/R0/PS5/:/files:ro
+      - ./cache:/cache

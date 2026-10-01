@@ -2,6 +2,10 @@
 
 **PKG Sender** installs PlayStation games over LAN from your PC: pick games, they queue up and install on the console. No USB juggling, no manual IP typing. PS5 **PKG** games install fine, no FPKG patching needed on your side. Disc images (`.exfat` / `.ffpfsc` / `.ffpkg`) copy straight to `/data/homebrew`.
 
+> **Contributors / AI agents:** start with [`AGENTS.md`](AGENTS.md) — repo map, build & test
+> commands, console protocol, and the PKG-parser parity rule. The Docker web UI lives in
+> [`docker-ps4-pkg-sender/`](docker-ps4-pkg-sender/) with its own README.
+
 ## Download
 
 Get `PkgSender-Setup-X.Y.Z.exe` from [Releases](../../releases) — self-contained, no .NET needed, no admin needed.

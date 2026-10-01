@@ -94,7 +94,7 @@
 						</thead>
 						<tbody>
 							{{#pkgs}}
-							<tr class="row" data-rel="{{rel}}" data-bytes="{{bytes}}" data-name="{{name}}"
+							<tr class="row" data-id="{{id}}" data-rel="{{rel}}" data-bytes="{{bytes}}" data-name="{{name}}"
 								data-role="{{role}}" data-content-id="{{contentId}}" data-title="{{title}}">
 								<td class="col-check"><input type="checkbox" class="form-check-input row-check"/></td>
 								<td class="col-dir">{{dir}}</td>
@@ -111,7 +111,7 @@
 									<button type="button" class="btn btn-outline-secondary btn-sm copy-link" title="复制直链">
 										<i class="fa-solid fa-link"></i>
 									</button>
-									<button type="button" class="btn btn-primary btn-sm install-one" data-rel="{{rel}}">
+									<button type="button" class="btn btn-primary btn-sm install-one" data-id="{{id}}" data-rel="{{rel}}">
 										<i class="fa-solid fa-cloud-arrow-down"></i> INSTALL
 									</button>
 								</td>

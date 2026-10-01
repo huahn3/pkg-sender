@@ -14,7 +14,7 @@ const static_files_path = path.resolve(process.env.STATIC_FILES ?? './files');
 const cache_dir = path.resolve(process.env.CACHE_DIR ?? './cache');
 const ps4_ip = process.env.PS4IP ?? 'localhost';
 const local_ip = process.env.LOCALIP ?? 'localhost';
-const ps4_port = process.env.PS4PORT ?? 12800;
+const ps4_port = parseInt(process.env.PS4PORT ?? '12800', 10);
 const install_delay_ms = parseInt(process.env.INSTALL_DELAY_MS ?? '300', 10);
 
 const app = express();
@@ -39,6 +39,26 @@ app.set('views', __dirname + '/views');
 let console_cache = { at: 0, data: null };
 const queue_state = { tasks: [], updatedAt: 0 };
 
+// Stable ID mapping (parity with Loopayeh/pkg-sender LoopDPI.Core/RangeFileServer.cs):
+// Avoid putting raw filenames, Chinese paths, spaces, brackets into the URL.
+// The PS5 receiver's json_first_package calls url_decode, turning %XX back to raw bytes.
+// If raw non-ASCII bytes reach Node's HTTP parser (llhttp), it returns 400 Bad Request.
+// By serving /pkg/:id (e.g. /pkg/lib-4a8f9b2c1d3e5f67), the URL is 100% clean ASCII.
+const id_to_abs = new Map();
+const abs_to_id = new Map();
+
+function stable_id(rel, size) {
+  const norm = rel.split(path.sep).join('/').toLowerCase();
+  const h = crypto.createHash('sha256').update(norm + '|' + (size || 0)).digest('hex');
+  return 'lib-' + h.slice(0, 16);
+}
+
+function resolve_file(target) {
+  if (typeof target !== 'string' || target.length === 0) return null;
+  if (id_to_abs.has(target)) return id_to_abs.get(target);
+  return safe_resolve(target);
+}
+
 app.get('/', function (req, res) {
   const groups = build_groups();
   const total = groups.reduce((n, g) => n + g.pkgs.length, 0);
@@ -53,6 +73,18 @@ app.get('/', function (req, res) {
   });
 });
 
+// Serve PKG by stable id (preferred: clean ASCII url, no charset/encoding issues on PS5)
+app.get('/pkg/:id', function (req, res, next) {
+  const abs = id_to_abs.get(req.params.id);
+  if (abs && fs.existsSync(abs)) {
+    return res.sendFile(abs, function (err) {
+      if (err && !res.headersSent) res.status(404).end('not found');
+    });
+  }
+  next();
+});
+
+// Fallback: serve PKG by relative path
 app.get('/pkg/*', function (req, res) {
   const abs = safe_resolve(req.params[0]);
   if (!abs) return res.status(404).end('not found');
@@ -88,10 +120,12 @@ app.get('/api/queue', function (req, res) {
 });
 
 app.post('/install', function (req, res) {
-  const rel = rel_from_filepath(req.body.filepath);
-  if (!rel) return res.status(400).end('invalid file');
+  const target = req.body.filepath || req.body.file;
+  const abs = resolve_file(target) || (typeof target === 'string' ? safe_resolve(rel_from_filepath(target)) : null);
+  if (!abs) return res.status(400).end('invalid file');
+  const item = scan_item(rel_from_abs(abs), abs);
   res.type('text/plain; charset=utf-8');
-  ps4_install(rel)
+  ps4_install(item)
     .then((r) => res.end(JSON.stringify(r, null, 2)))
     .catch((e) => res.status(502).end(`error: ${e.message}`));
 });
@@ -124,7 +158,7 @@ app.post('/api/install', async function (req, res) {
   const files = Array.isArray(req.body && req.body.files) ? req.body.files : [];
   const items = [];
   for (const f of files) {
-    const abs = safe_resolve(String(f));
+    const abs = resolve_file(String(f));
     if (!abs || path.extname(abs).toLowerCase() !== '.pkg') {
       return res.status(400).json({ ok: false, error: `invalid file: ${f}` });
     }
@@ -198,6 +232,7 @@ app.post('/api/install', async function (req, res) {
 });
 
 app.listen(port, function () {
+  try { build_groups(); } catch (e) { console.error('Initial scan error:', e.message); }
   console.log(`PS4/PS5 PKG sender listening on port ${port}`);
   console.log(`  files:   ${static_files_path}`);
   console.log(`  cache:   ${cache_dir}`);
@@ -223,7 +258,11 @@ function scan_item(rel, abs) {
   let stat;
   try { stat = fs.statSync(abs); } catch (e) { stat = { size: 0 }; }
   const meta = readMetaSync(abs, cache_dir);
+  const id = stable_id(rel, stat.size);
+  id_to_abs.set(id, abs);
+  abs_to_id.set(abs, id);
   return {
+    id: id,
     rel: rel,
     name: path.basename(abs),
     dir: dir_of(rel),
@@ -276,6 +315,7 @@ function build_groups() {
       size: filesize(list.reduce((n, i) => n + i.bytes, 0)),
       roles: roles,
       pkgs: list.map((i) => ({
+        id: i.id,
         rel: i.rel,
         dir: i.dir,
         name: i.name,
@@ -332,8 +372,37 @@ function rel_from_filepath(filepath) {
   return safe_resolve(rel_from_abs(abs)) ? rel_from_abs(abs) : null;
 }
 
-function pkg_url(rel) {
-  const encoded = rel.split('/').map(encodeURIComponent).join('/');
+function normalize_item(it) {
+  if (!it) return null;
+  if (typeof it === 'object' && it.rel) return it;
+  const str = String(it);
+  const abs = resolve_file(str);
+  if (abs) return scan_item(rel_from_abs(abs), abs);
+  return { rel: str, name: path.basename(str) };
+}
+
+function pkg_url(itemOrRel) {
+  if (typeof itemOrRel === 'object' && itemOrRel && itemOrRel.id) {
+    return `http://${local_ip}:${port}/pkg/${itemOrRel.id}`;
+  }
+  const str = typeof itemOrRel === 'string' ? itemOrRel : (itemOrRel?.rel || '');
+  if (id_to_abs.has(str)) {
+    return `http://${local_ip}:${port}/pkg/${str}`;
+  }
+  const abs = safe_resolve(str);
+  if (abs) {
+    if (abs_to_id.has(abs)) {
+      return `http://${local_ip}:${port}/pkg/${abs_to_id.get(abs)}`;
+    }
+    try {
+      const size = fs.statSync(abs).size;
+      const id = stable_id(rel_from_abs(abs), size);
+      id_to_abs.set(id, abs);
+      abs_to_id.set(abs, id);
+      return `http://${local_ip}:${port}/pkg/${id}`;
+    } catch (e) {}
+  }
+  const encoded = str.split('/').map(encodeURIComponent).join('/');
   return `http://${local_ip}:${port}/pkg/${encoded}`;
 }
 
@@ -345,13 +414,13 @@ function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
 // ---------------------------------------------------------------- console
 
-function tcp_open(host, ip, ms) {
+function tcp_open(host, port, ms) {
   return new Promise(function (resolve) {
     const s = new net.Socket();
     const timer = setTimeout(function () { s.destroy(); resolve(false); }, ms);
     s.once('connect', function () { clearTimeout(timer); s.destroy(); resolve(true); });
     s.once('error', function () { clearTimeout(timer); s.destroy(); resolve(false); });
-    s.connect(ip, host);
+    s.connect(port, host);
   });
 }
 
@@ -410,9 +479,7 @@ async function probe_console() {
     detail: ''
   };
 
-  const open12800 = ps4_port === 12800
-    ? await tcp_open(ps4_ip, 12800, 1500)
-    : await tcp_open(ps4_ip, ps4_port, 1500);
+  const open12800 = await tcp_open(ps4_ip, ps4_port, 1500);
   out.ports[String(ps4_port)] = open12800 ? 'open' : 'closed';
 
   if (open12800) {
@@ -458,11 +525,17 @@ async function probe_console() {
 // ---------------------------------------------------------------- install
 
 async function ps4_install(item) {
+  const norm = normalize_item(item);
+  if (!norm) throw new Error('invalid item');
+  const url = pkg_url(norm);
+  const name = norm.meta && norm.meta.ok ? norm.meta.title : norm.name;
+  const icon = norm.meta && norm.meta.ok ? icon_url(norm.meta.iconKey) : '';
+
   const body = JSON.stringify({
     type: 'direct',
-    packages: [pkg_url(item.rel)],
-    name: item.meta && item.meta.ok ? item.meta.title : item.name,
-    icon_url: item.meta && item.meta.ok ? icon_url(item.meta.iconKey) : ''
+    packages: [url],
+    name: name,
+    icon_url: icon
   });
   const r = await console_http(ps4_ip, ps4_port, '/api/install', body, 20000);
   const ok = /success/i.test(r.body || '');
