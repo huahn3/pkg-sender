@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh">
+	<head>
+		<meta charset="utf-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1"/>
+		<title>PKG Sender</title>
+		<link rel="stylesheet" href="/css/fontawesome.min.css"/>
+		<link rel="stylesheet" href="/css/brands.min.css"/>
+		<link rel="stylesheet" href="/css/solid.min.css"/>
+		<link rel="stylesheet" href="/css/bootstrap.min.css"/>
+		<link rel="stylesheet" href="/css/style.css"/>
+	</head>
+	<body>
+		<header class="topbar">
+			<div class="brand"><i class="fa-solid fa-playstation"></i> PKG Sender</div>
+
+			<button type="button" class="console-pill" id="console_pill" title="点击刷新主机状态">
+				<span class="dot" id="console_dot"></span>
+				<span id="console_label">检测中…</span>
+				<span class="console-detail" id="console_detail"></span>
+				<i class="fa-solid fa-rotate ms-1"></i>
+			</button>
+
+			<div class="search-wrap">
+				<i class="fa-solid fa-magnifying-glass"></i>
+				<input id="search" type="search" placeholder="搜索标题 / 文件名 / Title ID" autocomplete="off"/>
+				<button type="button" id="clear_search" class="clear d-none">✕</button>
+			</div>
+
+			<select id="sort" class="form-select form-select-sm">
+				<option value="name">按名称</option>
+				<option value="size">按大小</option>
+				<option value="count">按数量</option>
+			</select>
+
+			<span class="total">{{total}} 个 · {{totalSize}}</span>
+
+			<button type="button" class="btn btn-success" id="install_everything">
+				<i class="fa-solid fa-forward-fast"></i> 一键安装全部 ({{total}})
+			</button>
+		</header>
+
+		<main id="list">
+			{{^total}}
+			<div class="alert alert-info m-3">
+				没有找到 .pkg 文件。把游戏放进挂载目录（例如 <code>/files/游戏名/*.pkg</code>）后刷新页面。
+			</div>
+			{{/total}}
+
+			{{#groups}}
+			<section class="group" data-key="{{key}}" data-title="{{title}}" data-title-id="{{titleId}}"
+				data-bytes="{{bytes}}" data-count="{{count}}" data-platform="{{platform}}">
+				<div class="ghead" data-bs-toggle="collapse" data-bs-target="#collapse_{{id}}">
+					<div class="cover">
+						{{#icon}}<img src="/icon/{{icon}}.png" alt=""/>{{/icon}}
+						{{^icon}}<i class="fa-solid fa-gamepad"></i>{{/icon}}
+					</div>
+					<div class="gmeta">
+						<div class="gtitle">{{title}}</div>
+						<div class="gbadges">
+							{{#titleId}}<span class="badge bid">{{titleId}}</span>{{/titleId}}
+							{{#platform}}<span class="badge bplat">{{platform}}</span>{{/platform}}
+							{{#roles.Game}}<span class="badge bgame">本体 {{roles.Game}}</span>{{/roles.Game}}
+							{{#roles.Patch}}<span class="badge bpatch">更新 {{roles.Patch}}</span>{{/roles.Patch}}
+							{{#roles.DLC}}<span class="badge bdlc">DLC {{roles.DLC}}</span>{{/roles.DLC}}
+							{{#roles.Other}}<span class="badge bother">{{roles.Other}} 未知</span>{{/roles.Other}}
+							<span class="badge bcnt">{{count}} 个 · {{size}}</span>
+						</div>
+					</div>
+					<div class="gactions" data-stop>
+						<button type="button" class="btn btn-outline-danger btn-sm uninstall-game"
+							title="在主机上删除本体（仅 RPI 模式可用）">
+							<i class="fa-solid fa-trash"></i>
+						</button>
+						<button type="button" class="btn btn-success btn-sm install-folder" data-target="#collapse_{{id}}">
+							<i class="fa-solid fa-cloud-arrow-down"></i> 安装全部 ({{count}})
+						</button>
+						<i class="fa-solid fa-chevron-down chev"></i>
+					</div>
+				</div>
+
+				<div id="collapse_{{id}}" class="collapse">
+					<table class="table table-sm table-hover m-0">
+						<thead>
+							<tr>
+								<th class="col-check"><input type="checkbox" class="form-check-input check-all" title="全选此游戏"/></th>
+								<th>目录</th>
+								<th>文件</th>
+								<th>版本</th>
+								<th>类型</th>
+								<th class="text-end">大小</th>
+								<th class="text-end">操作</th>
+							</tr>
+						</thead>
+						<tbody>
+							{{#pkgs}}
+							<tr class="row" data-rel="{{rel}}" data-bytes="{{bytes}}" data-name="{{name}}"
+								data-role="{{role}}" data-content-id="{{contentId}}" data-title="{{title}}">
+								<td class="col-check"><input type="checkbox" class="form-check-input row-check"/></td>
+								<td class="col-dir">{{dir}}</td>
+								<td class="col-name">
+									{{#icon}}<img class="thumb" src="/icon/{{icon}}.png" alt=""/>{{/icon}}
+									<span class="fname" title="{{name}}">{{name}}</span>
+								</td>
+								<td>{{version}}</td>
+								<td>
+									{{#role}}<span class="role role-{{role}}">{{role}}</span>{{/role}}
+								</td>
+								<td class="text-end">{{size}}</td>
+								<td class="text-end ops">
+									<button type="button" class="btn btn-outline-secondary btn-sm copy-link" title="复制直链">
+										<i class="fa-solid fa-link"></i>
+									</button>
+									<button type="button" class="btn btn-primary btn-sm install-one" data-rel="{{rel}}">
+										<i class="fa-solid fa-cloud-arrow-down"></i> INSTALL
+									</button>
+								</td>
+							</tr>
+							{{/pkgs}}
+						</tbody>
+					</table>
+				</div>
+			</section>
+			{{/groups}}
+		</main>
+
+		<div id="selbar" class="selbar d-none">
+			<span id="sel_count">已选 0</span>
+			<span class="text-muted" id="sel_size"></span>
+			<button type="button" class="btn btn-outline-light btn-sm" id="sel_clear">取消选择</button>
+			<button type="button" class="btn btn-success" id="sel_install">
+				<i class="fa-solid fa-cloud-arrow-down"></i> 安装选中的
+			</button>
+		</div>
+
+		<div id="queue" class="queue d-none">
+			<div class="qhead">
+				<strong id="q_title">安装队列</strong>
+				<span class="qconsole" id="q_console"></span>
+				<button type="button" class="btn-close" id="q_close" aria-label="关闭"></button>
+			</div>
+			<div class="qbody" id="q_body"></div>
+			<div class="qfoot">
+				<span id="q_summary" class="text-muted"></span>
+				<button type="button" class="btn btn-outline-secondary btn-sm" id="q_clear">清空</button>
+			</div>
+		</div>
+
+		<script>window.__BASE__ = 'http://{{localIp}}:{{port}}';</script>
+		<script src="/js/jquery.slim.min.js"></script>
+		<script src="/js/bootstrap.min.js"></script>
+		<script src="/js/app.js"></script>
+	</body>
+</html>

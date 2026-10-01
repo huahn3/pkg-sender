@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  ps4-pkg-sender:
+    build: .
+    image: ps4-pkg-sender:local
+    container_name: ps4-pkg-sender
+    restart: unless-stopped
+    ports:
+      - "7895:7895"
+    environment:
+      - PORT=7895
+      - STATIC_FILES=/files
+      - LOCALIP=192.168.31.88
+      - PS4IP=192.168.32.176
+      - PS4PORT=12800
+      - INSTALL_DELAY_MS=300
+    volumes:
+      - /vol2/1000/R0/PS5/:/files:ro
