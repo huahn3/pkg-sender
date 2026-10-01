@@ -1,11 +1,11 @@
-FROM node:16.17-alpine as build
+FROM node:20-alpine AS build
 
 WORKDIR /pkg_sender
 
-COPY package.json package.json
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
-FROM node:16.17-alpine
+FROM node:20-alpine
 
 RUN apk --no-cache add curl
 

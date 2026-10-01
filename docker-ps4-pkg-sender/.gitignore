@@ -1,5 +1,5 @@
+# local test data + generated artifacts (regenerate: tools/make_fake_pkgs.py)
 /files/*
+/cache/
 /node_modules/*
-/package-lock.json
 server.log
-cache/

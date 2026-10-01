@@ -5,12 +5,16 @@ Release2/
 bin/
 obj/
 *.pdb
+# dependencies / logs (node subproject + general)
+node_modules/
+*.log
 # local test artifacts
 test-pkgs/
 # payload ELF builds stay local-only, never push
 payload/*.elf
 # installer output (built locally per release)
 PkgSender-Setup-*.exe
-# IDE
+# IDE / OS
 .vs/
 *.user
+.DS_Store
